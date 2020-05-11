@@ -27,6 +27,7 @@ import org.springframework.expression.TypedValue;
 import org.springframework.expression.spel.CodeFlow;
 import org.springframework.expression.spel.ExpressionState;
 import org.springframework.expression.spel.SpelNode;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
@@ -35,6 +36,7 @@ import org.springframework.util.Assert;
  *
  * @author Andy Clement
  * @author Harry Yang
+ * @author Semyon Danilov
  * @since 3.0.4
  */
 public class InlineList extends SpelNodeImpl {
@@ -68,7 +70,7 @@ public class InlineList extends SpelNodeImpl {
 						return null;
 					}
 				}
-				else {
+				else if (!(child instanceof OpMinus) || !((OpMinus) child).isNegativeNumber()) {
 					return null;
 				}
 			}
@@ -76,6 +78,7 @@ public class InlineList extends SpelNodeImpl {
 
 		List<Object> constantList = new ArrayList<>();
 		int childcount = getChildCount();
+		ExpressionState expressionState = new ExpressionState(new StandardEvaluationContext());
 		for (int c = 0; c < childcount; c++) {
 			SpelNode child = getChild(c);
 			if (child instanceof Literal) {
@@ -83,6 +86,9 @@ public class InlineList extends SpelNodeImpl {
 			}
 			else if (child instanceof InlineList) {
 				constantList.add(((InlineList) child).getConstantValue());
+			}
+			else if (child instanceof OpMinus) {
+				constantList.add(child.getValue(expressionState));
 			}
 		}
 		return new TypedValue(Collections.unmodifiableList(constantList));

@@ -22,8 +22,12 @@ import java.util.Optional;
 
 import org.junit.Test;
 
+import org.springframework.core.OverridingClassLoader;
+import org.springframework.core.io.DefaultResourceLoader;
+import org.springframework.core.io.UrlResource;
 import org.springframework.tests.sample.beans.TestBean;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.*;
 
 /**
@@ -153,18 +157,58 @@ public class BeanWrapperTests extends AbstractPropertyAccessorTests {
 	}
 
 	@Test
-	public void propertyDescriptors() {
+	public void propertyDescriptors() throws Exception {
 		TestBean target = new TestBean();
 		target.setSpouse(new TestBean());
 		BeanWrapper accessor = createAccessor(target);
 		accessor.setPropertyValue("name", "a");
 		accessor.setPropertyValue("spouse.name", "b");
-		assertEquals("a", target.getName());
-		assertEquals("b", target.getSpouse().getName());
-		assertEquals("a", accessor.getPropertyValue("name"));
-		assertEquals("b", accessor.getPropertyValue("spouse.name"));
-		assertEquals(String.class, accessor.getPropertyDescriptor("name").getPropertyType());
-		assertEquals(String.class, accessor.getPropertyDescriptor("spouse.name").getPropertyType());
+
+		assertThat(target.getName()).isEqualTo("a");
+		assertThat(target.getSpouse().getName()).isEqualTo("b");
+		assertThat(accessor.getPropertyValue("name")).isEqualTo("a");
+		assertThat(accessor.getPropertyValue("spouse.name")).isEqualTo("b");
+		assertThat(accessor.getPropertyDescriptor("name").getPropertyType()).isEqualTo(String.class);
+		assertThat(accessor.getPropertyDescriptor("spouse.name").getPropertyType()).isEqualTo(String.class);
+
+		assertThat(accessor.isReadableProperty("class.package")).isFalse();
+		assertThat(accessor.isReadableProperty("class.module")).isFalse();
+		assertThat(accessor.isReadableProperty("class.classLoader")).isFalse();
+		assertThat(accessor.isReadableProperty("class.name")).isTrue();
+		assertThat(accessor.isReadableProperty("class.simpleName")).isTrue();
+		assertThat(accessor.getPropertyValue("class.name")).isEqualTo(TestBean.class.getName());
+		assertThat(accessor.getPropertyValue("class.simpleName")).isEqualTo(TestBean.class.getSimpleName());
+		assertThat(accessor.getPropertyDescriptor("class.name").getPropertyType()).isEqualTo(String.class);
+		assertThat(accessor.getPropertyDescriptor("class.simpleName").getPropertyType()).isEqualTo(String.class);
+
+		accessor = createAccessor(new DefaultResourceLoader());
+
+		assertThat(accessor.isReadableProperty("class.package")).isFalse();
+		assertThat(accessor.isReadableProperty("class.module")).isFalse();
+		assertThat(accessor.isReadableProperty("class.classLoader")).isFalse();
+		assertThat(accessor.isReadableProperty("class.name")).isTrue();
+		assertThat(accessor.isReadableProperty("class.simpleName")).isTrue();
+		assertThat(accessor.isReadableProperty("classLoader")).isTrue();
+		assertThat(accessor.isWritableProperty("classLoader")).isTrue();
+		OverridingClassLoader ocl = new OverridingClassLoader(getClass().getClassLoader());
+		accessor.setPropertyValue("classLoader", ocl);
+		assertThat(accessor.getPropertyValue("classLoader")).isSameAs(ocl);
+
+		accessor = createAccessor(new UrlResource("https://spring.io"));
+
+		assertThat(accessor.isReadableProperty("class.package")).isFalse();
+		assertThat(accessor.isReadableProperty("class.module")).isFalse();
+		assertThat(accessor.isReadableProperty("class.classLoader")).isFalse();
+		assertThat(accessor.isReadableProperty("class.name")).isTrue();
+		assertThat(accessor.isReadableProperty("class.simpleName")).isTrue();
+		assertThat(accessor.isReadableProperty("URL.protocol")).isTrue();
+		assertThat(accessor.isReadableProperty("URL.host")).isTrue();
+		assertThat(accessor.isReadableProperty("URL.port")).isTrue();
+		assertThat(accessor.isReadableProperty("URL.file")).isTrue();
+		assertThat(accessor.isReadableProperty("URL.content")).isFalse();
+		assertThat(accessor.isReadableProperty("inputStream")).isFalse();
+		assertThat(accessor.isReadableProperty("filename")).isTrue();
+		assertThat(accessor.isReadableProperty("description")).isTrue();
 	}
 
 	@Test

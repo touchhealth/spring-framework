@@ -20,6 +20,8 @@ import java.beans.BeanInfo;
 import java.beans.IntrospectionException;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
+import java.net.URL;
+import java.security.ProtectionDomain;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -288,9 +290,17 @@ public class CachedIntrospectionResults {
 			// This call is slow so we do it once.
 			PropertyDescriptor[] pds = this.beanInfo.getPropertyDescriptors();
 			for (PropertyDescriptor pd : pds) {
-				if (Class.class == beanClass &&
-						("classLoader".equals(pd.getName()) ||  "protectionDomain".equals(pd.getName()))) {
-					// Ignore Class.getClassLoader() and getProtectionDomain() methods - nobody needs to bind to those
+				if (Class.class == beanClass && !("name".equals(pd.getName()) ||
+						(pd.getName().endsWith("Name") && String.class == pd.getPropertyType()))) {
+					// Only allow all name variants of Class properties
+					continue;
+				}
+				if (URL.class == beanClass && "content".equals(pd.getName())) {
+					// Only allow URL attribute introspection, not content resolution
+					continue;
+				}
+				if (pd.getWriteMethod() == null && isInvalidReadOnlyPropertyType(pd.getPropertyType())) {
+					// Ignore read-only properties such as ClassLoader - no need to bind to those
 					continue;
 				}
 				if (logger.isTraceEnabled()) {
@@ -314,6 +324,10 @@ public class CachedIntrospectionResults {
 					for (PropertyDescriptor pd : ifcPds) {
 						if (!this.propertyDescriptorCache.containsKey(pd.getName())) {
 							pd = buildGenericTypeAwarePropertyDescriptor(beanClass, pd);
+							if (pd.getWriteMethod() == null && isInvalidReadOnlyPropertyType(pd.getPropertyType())) {
+								// Ignore read-only properties such as ClassLoader - no need to bind to those
+								continue;
+							}
 							this.propertyDescriptorCache.put(pd.getName(), pd);
 						}
 					}
@@ -326,6 +340,12 @@ public class CachedIntrospectionResults {
 		catch (IntrospectionException ex) {
 			throw new FatalBeanException("Failed to obtain BeanInfo for class [" + beanClass.getName() + "]", ex);
 		}
+	}
+
+	private boolean isInvalidReadOnlyPropertyType(Class<?> returnType) {
+		return (returnType != null && (AutoCloseable.class.isAssignableFrom(returnType) ||
+				ClassLoader.class.isAssignableFrom(returnType) ||
+				ProtectionDomain.class.isAssignableFrom(returnType)));
 	}
 
 	BeanInfo getBeanInfo() {

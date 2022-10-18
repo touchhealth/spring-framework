@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2014 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,15 +18,19 @@ package org.springframework.expression.spel;
 
 import org.junit.Test;
 
+import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
 
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.junit.Assert.*;
 
 /**
  * Test construction of arrays.
  *
  * @author Andy Clement
+ * @author Juergen Hoeller
  */
 public class ArrayConstructorTests extends AbstractExpressionTests {
 
@@ -89,7 +93,7 @@ public class ArrayConstructorTests extends AbstractExpressionTests {
 	public void typeArrayConstructors() {
 		evaluate("new String[]{'a','b','c','d'}[1]", "b", String.class);
 		evaluateAndCheckError("new String[]{'a','b','c','d'}.size()", SpelMessage.METHOD_NOT_FOUND, 30, "size()",
-			"java.lang.String[]");
+				"java.lang.String[]");
 		evaluate("new String[]{'a','b','c','d'}.length", 4, Integer.class);
 	}
 
@@ -102,8 +106,15 @@ public class ArrayConstructorTests extends AbstractExpressionTests {
 	public void multiDimensionalArray() {
 		evaluate("new String[2][2]", "[Ljava.lang.String;[2]{[2]{null,null},[2]{null,null}}", String[][].class);
 		evaluate("new String[3][2][1]",
-			"[[Ljava.lang.String;[3]{[2]{[1]{null},[1]{null}},[2]{[1]{null},[1]{null}},[2]{[1]{null},[1]{null}}}",
-			String[][][].class);
+				"[[Ljava.lang.String;[3]{[2]{[1]{null},[1]{null}},[2]{[1]{null},[1]{null}},[2]{[1]{null},[1]{null}}}",
+				String[][][].class);
+	}
+
+	@Test
+	public void noArrayConstruction() {
+		EvaluationContext context = SimpleEvaluationContext.forReadWriteDataBinding().build();
+		assertThatExceptionOfType(SpelEvaluationException.class).isThrownBy(() ->
+				parser.parseExpression("new int[2]").getValue(context));
 	}
 
 	@Test

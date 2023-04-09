@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.Stack;
 
 import org.springframework.core.convert.TypeDescriptor;
@@ -35,17 +36,18 @@ import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 
 /**
- * An ExpressionState is for maintaining per-expression-evaluation state, any changes to
- * it are not seen by other expressions but it gives a place to hold local variables and
+ * ExpressionState is for maintaining per-expression-evaluation state: any changes to
+ * it are not seen by other expressions, but it gives a place to hold local variables and
  * for component expressions in a compound expression to communicate state. This is in
  * contrast to the EvaluationContext, which is shared amongst expression evaluations, and
  * any changes to it will be seen by other expressions or any code that chooses to ask
  * questions of the context.
  *
- * <p>It also acts as a place for to define common utility routines that the various AST
+ * <p>It also acts as a place to define common utility routines that the various AST
  * nodes might need.
  *
  * @author Andy Clement
+ * @author Sam Brannen
  * @since 3.0
  */
 public class ExpressionState {
@@ -137,6 +139,29 @@ public class ExpressionState {
 		return this.scopeRootObjects.peek();
 	}
 
+	/**
+	 * Assign the value created by the specified {@link Supplier} to a named variable
+	 * within the evaluation context.
+	 * <p>In contrast to {@link #setVariable(String, Object)}, this method should
+	 * only be invoked to support assignment within an expression.
+	 * @param name the name of the variable to assign
+	 * @param valueSupplier the supplier of the value to be assigned to the variable
+	 * @return a {@link TypedValue} wrapping the assigned value
+	 * @since 5.2.24
+	 * @see EvaluationContext#assignVariable(String, Supplier)
+	 */
+	public TypedValue assignVariable(String name, Supplier<TypedValue> valueSupplier) {
+		return this.relatedContext.assignVariable(name, valueSupplier);
+	}
+
+	/**
+	 * Set a named variable in the evaluation context to a specified value.
+	 * <p>In contrast to {@link #assignVariable(String, Supplier)}, this method
+	 * should only be invoked programmatically.
+	 * @param name the name of the variable to set
+	 * @param value the value to be placed in the variable
+	 * @see EvaluationContext#setVariable(String, Object)
+	 */
 	public void setVariable(String name, Object value) {
 		this.relatedContext.setVariable(name, value);
 	}

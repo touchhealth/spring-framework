@@ -38,11 +38,13 @@ import org.springframework.expression.MethodResolver;
 import org.springframework.expression.ParseException;
 import org.springframework.expression.spel.standard.SpelExpression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.expression.spel.support.StandardTypeLocator;
 import org.springframework.expression.spel.testresources.TestPerson;
 
-import static org.hamcrest.Matchers.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.junit.Assert.*;
 
 /**
@@ -352,8 +354,29 @@ public class EvaluationTests extends AbstractExpressionTests {
 
 	// assignment
 	@Test
-	public void testAssignmentToVariables01() {
-		evaluate("#var1='value1'", "value1", String.class);
+	public void testAssignmentToVariableWithStandardEvaluationContext() {
+		evaluate("#var1 = 'value1'", "value1", String.class);
+	}
+
+	@Test
+	public void testAssignmentToVariableWithSimpleEvaluationContext01() {
+		testAssignmentToVariableWithSimpleEvaluationContext("#var1 = 'value1'", "#var1");
+	}
+
+	@Test
+	public void testAssignmentToVariableWithSimpleEvaluationContext02() {
+		testAssignmentToVariableWithSimpleEvaluationContext("true ? #myVar = 4 : 0", "#myVar");
+	}
+
+	private void testAssignmentToVariableWithSimpleEvaluationContext(String expression, String varName) {
+		EvaluationContext context = SimpleEvaluationContext.forReadWriteDataBinding().build();
+		Expression expr = parser.parseExpression(expression);
+		assertThatExceptionOfType(SpelEvaluationException.class)
+				.isThrownBy(() -> expr.getValue(context))
+				.satisfies(ex -> {
+					assertThat(ex.getMessageCode()).isEqualTo(SpelMessage.VARIABLE_ASSIGNMENT_NOT_SUPPORTED);
+					assertThat(ex.getInserts()).as("inserts").containsExactly(varName);
+				});
 	}
 
 	@Test
@@ -685,14 +708,14 @@ public class EvaluationTests extends AbstractExpressionTests {
 		SpelExpressionParser parser = new SpelExpressionParser( new SpelParserConfiguration(true, true, 3));
 		Expression e = parser.parseExpression("foo[2]");
 		e.setValue(ctx, "2");
-		assertThat(instance.getFoo().size(), equalTo(3));
+		assertThat(instance.getFoo().size()).isEqualTo(3);
 		e = parser.parseExpression("foo[3]");
 		try {
 			e.setValue(ctx, "3");
 		}
 		catch (SpelEvaluationException see) {
 			assertEquals(SpelMessage.UNABLE_TO_GROW_COLLECTION, see.getMessageCode());
-			assertThat(instance.getFoo().size(), equalTo(3));
+			assertThat(instance.getFoo().size()).isEqualTo(3);
 		}
 	}
 

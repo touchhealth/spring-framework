@@ -259,7 +259,11 @@ public enum SpelMessage {
 
 	/** @since 5.3.17 */
 	MAX_ARRAY_ELEMENTS_THRESHOLD_EXCEEDED(Kind.ERROR, 1075,
-			"Array declares too many elements, exceeding the threshold of ''{0}''");
+			"Array declares too many elements, exceeding the threshold of ''{0}''"),
+
+	/** @since 5.2.24 */
+	VARIABLE_ASSIGNMENT_NOT_SUPPORTED(Kind.ERROR, 1080,
+			"Assignment to variable ''{0}'' is not supported");
 
 
 	private final Kind kind;

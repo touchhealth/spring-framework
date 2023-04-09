@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.expression.spel.ast;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
+import java.util.function.Supplier;
 
 import org.springframework.asm.MethodVisitor;
 import org.springframework.asm.Opcodes;
@@ -31,7 +32,6 @@ import org.springframework.expression.spel.SpelEvaluationException;
 import org.springframework.expression.spel.SpelMessage;
 import org.springframework.expression.spel.SpelNode;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
-import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 
 /**
@@ -39,6 +39,7 @@ import org.springframework.util.ObjectUtils;
  * format expression.
  *
  * @author Andy Clement
+ * @author Sam Brannen
  * @since 3.0
  */
 public abstract class SpelNodeImpl implements SpelNode, Opcodes {
@@ -143,8 +144,29 @@ public abstract class SpelNodeImpl implements SpelNode, Opcodes {
 
 	@Override
 	public void setValue(ExpressionState expressionState, Object newValue) throws EvaluationException {
-		throw new SpelEvaluationException(getStartPosition(),
-				SpelMessage.SETVALUE_NOT_SUPPORTED, getClass());
+		setValueInternal(expressionState, () -> new TypedValue(newValue));
+	}
+
+	/**
+	 * Evaluate the expression to a node and then set the new value created by the
+	 * specified {@link Supplier} on that node.
+	 * <p>For example, if the expression evaluates to a property reference, then the
+	 * property will be set to the new value.
+	 * <p>Favor this method over {@link #setValue(ExpressionState, Object)} when
+	 * the value should be lazily computed.
+	 * <p>By default, this method throws a {@link SpelEvaluationException},
+	 * effectively disabling this feature. Subclasses may override this method to
+	 * provide an actual implementation.
+	 * @param expressionState the current expression state (includes the context)
+	 * @param valueSupplier a supplier of the new value
+	 * @throws EvaluationException if any problem occurs evaluating the expression or
+	 * setting the new value
+	 * @since 5.2.24
+	 */
+	public TypedValue setValueInternal(ExpressionState expressionState, Supplier<TypedValue> valueSupplier)
+			throws EvaluationException {
+
+		throw new SpelEvaluationException(getStartPosition(), SpelMessage.SETVALUE_NOT_SUPPORTED, getClass());
 	}
 
 	@Override

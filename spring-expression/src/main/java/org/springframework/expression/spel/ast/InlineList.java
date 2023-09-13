@@ -70,7 +70,7 @@ public class InlineList extends SpelNodeImpl {
 						return null;
 					}
 				}
-				else if (!(child instanceof OpMinus) || !((OpMinus) child).isNegativeNumber()) {
+				else if (!(child instanceof OpMinus) || !((OpMinus) child).isNegativeNumberLiteral()) {
 					return null;
 				}
 			}

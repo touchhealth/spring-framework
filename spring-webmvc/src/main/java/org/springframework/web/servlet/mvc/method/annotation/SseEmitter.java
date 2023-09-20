@@ -227,6 +227,9 @@ public class SseEmitter extends ResponseBodyEmitter {
 		public SseEventBuilder data(Object object, @Nullable MediaType mediaType) {
 			append("data:");
 			saveAppendedText();
+			if (object instanceof String) {
+				object = StringUtils.replace((String) object, "\n", "\ndata:");
+			}
 			this.dataToSend.add(new DataWithMediaType(object, mediaType));
 			append('\n');
 			return this;

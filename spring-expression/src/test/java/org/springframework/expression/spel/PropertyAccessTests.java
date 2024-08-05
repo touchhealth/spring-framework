@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.assertj.core.api.ThrowableTypeAssert;
 import org.junit.Test;
 
 import org.springframework.core.convert.TypeDescriptor;
@@ -36,6 +37,7 @@ import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.expression.spel.testresources.Person;
 
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.junit.Assert.*;
 
 /**
@@ -206,13 +208,13 @@ public class PropertyAccessTests extends AbstractExpressionTests {
 		target.setName("p2");
 		assertEquals("p2", expr.getValue(context, target));
 
-		try {
-			parser.parseExpression("name='p3'").getValue(context, target);
-			fail("Should have thrown SpelEvaluationException");
-		}
-		catch (SpelEvaluationException ex) {
-			// expected
-		}
+		assertThatSpelEvaluationException()
+				.isThrownBy(() -> parser.parseExpression("name='p3'").getValue(context, target))
+				.extracting(SpelEvaluationException::getMessageCode).isEqualTo(SpelMessage.PROPERTY_OR_FIELD_NOT_WRITABLE);
+
+		assertThatSpelEvaluationException()
+				.isThrownBy(() -> parser.parseExpression("['name']='p4'").getValue(context, target))
+				.extracting(SpelEvaluationException::getMessageCode).isEqualTo(SpelMessage.INDEXING_NOT_SUPPORTED_FOR_TYPE);
 	}
 
 	@Test
@@ -254,6 +256,11 @@ public class PropertyAccessTests extends AbstractExpressionTests {
 
 		Person target = new Person("p1");
 		assertEquals("1", parser.parseExpression("name.substring(1)").getValue(context, target));
+	}
+
+
+	private ThrowableTypeAssert<SpelEvaluationException> assertThatSpelEvaluationException() {
+		return assertThatExceptionOfType(SpelEvaluationException.class);
 	}
 
 

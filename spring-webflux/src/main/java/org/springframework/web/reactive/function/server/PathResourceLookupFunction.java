@@ -18,21 +18,14 @@ package org.springframework.web.reactive.function.server;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.function.Function;
 
 import reactor.core.publisher.Mono;
 
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.http.server.PathContainer;
 import org.springframework.util.Assert;
-import org.springframework.util.ResourceUtils;
-import org.springframework.util.StringUtils;
-import org.springframework.web.util.UriUtils;
+import org.springframework.web.reactive.resource.ResourceHandlerUtils;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 
@@ -65,21 +58,14 @@ class PathResourceLookupFunction implements Function<ServerRequest, Mono<Resourc
 		}
 
 		pathContainer = this.pattern.extractPathWithinPattern(pathContainer);
-		String path = processPath(pathContainer.value());
-		if (!StringUtils.hasText(path) || isInvalidPath(path)) {
+		String path = ResourceHandlerUtils.normalizeInputPath(pathContainer.value());
+		if (ResourceHandlerUtils.shouldIgnoreInputPath(path)) {
 			return Mono.empty();
-		}
-		if (isInvalidEncodedInputPath(path)) {
-			return Mono.empty();
-		}
-
-		if (!(this.location instanceof UrlResource)) {
-			path = UriUtils.decode(path, StandardCharsets.UTF_8);
 		}
 
 		try {
-			Resource resource = this.location.createRelative(path);
-			if (resource.isReadable() && isResourceUnderLocation(resource)) {
+			Resource resource = ResourceHandlerUtils.createRelativeResource(this.location, path);
+			if (resource.isReadable() && ResourceHandlerUtils.isResourceUnderLocation(this.location, resource)) {
 				return Mono.just(resource);
 			}
 			else {
@@ -89,168 +75,6 @@ class PathResourceLookupFunction implements Function<ServerRequest, Mono<Resourc
 		catch (IOException ex) {
 			throw new UncheckedIOException(ex);
 		}
-	}
-
-	/**
-	 * Process the given resource path.
-	 * <p>The default implementation replaces:
-	 * <ul>
-	 * <li>Backslash with forward slash.
-	 * <li>Duplicate occurrences of slash with a single slash.
-	 * <li>Any combination of leading slash and control characters (00-1F and 7F)
-	 * with a single "/" or "". For example {@code "  / // foo/bar"}
-	 * becomes {@code "/foo/bar"}.
-	 * </ul>
-	 */
-	protected String processPath(String path) {
-		path = StringUtils.replace(path, "\\", "/");
-		path = cleanDuplicateSlashes(path);
-		path = cleanLeadingSlash(path);
-		return normalizePath(path);
-	}
-
-	private String cleanDuplicateSlashes(String path) {
-		StringBuilder sb = null;
-		char prev = 0;
-		for (int i = 0; i < path.length(); i++) {
-			char curr = path.charAt(i);
-			try {
-				if (curr == '/' && prev == '/') {
-					if (sb == null) {
-						sb = new StringBuilder(path.substring(0, i));
-					}
-					continue;
-				}
-				if (sb != null) {
-					sb.append(path.charAt(i));
-				}
-			}
-			finally {
-				prev = curr;
-			}
-		}
-		return (sb != null ? sb.toString() : path);
-	}
-
-	private String cleanLeadingSlash(String path) {
-		boolean slash = false;
-		for (int i = 0; i < path.length(); i++) {
-			if (path.charAt(i) == '/') {
-				slash = true;
-			}
-			else if (path.charAt(i) > ' ' && path.charAt(i) != 127) {
-				if (i == 0 || (i == 1 && slash)) {
-					return path;
-				}
-				return (slash ? "/" + path.substring(i) : path.substring(i));
-			}
-		}
-		return (slash ? "/" : "");
-	}
-
-	private static String normalizePath(String path) {
-		String result = path;
-		if (result.contains("%")) {
-			result = decode(result);
-			if (result.contains("%")) {
-				result = decode(result);
-			}
-			if (result.contains("../")) {
-				return StringUtils.cleanPath(result);
-			}
-		}
-		return path;
-	}
-
-	private static String decode(String path) {
-		try {
-			return URLDecoder.decode(path, StandardCharsets.UTF_8.name());
-		}
-		catch (Exception ex) {
-			return "";
-		}
-	}
-
-	private boolean isInvalidPath(String path) {
-		if (path.contains("WEB-INF") || path.contains("META-INF")) {
-			return true;
-		}
-		if (path.contains(":/")) {
-			String relativePath = (path.charAt(0) == '/' ? path.substring(1) : path);
-			if (ResourceUtils.isUrl(relativePath) || relativePath.startsWith("url:")) {
-				return true;
-			}
-		}
-		return path.contains("../");
-	}
-
-	/**
-	 * Check whether the given path contains invalid escape sequences.
-	 * @param path the path to validate
-	 * @return {@code true} if the path is invalid, {@code false} otherwise
-	 */
-	private boolean isInvalidEncodedInputPath(String path) {
-		if (path.contains("%")) {
-			try {
-				// Use URLDecoder (vs UriUtils) to preserve potentially decoded UTF-8 chars
-				String decodedPath = URLDecoder.decode(path, StandardCharsets.UTF_8.name());
-				if (isInvalidPath(decodedPath)) {
-					return true;
-				}
-				decodedPath = processPath(decodedPath);
-				if (isInvalidPath(decodedPath)) {
-					return true;
-				}
-			}
-			catch (IllegalArgumentException | UnsupportedEncodingException ex) {
-				// May not be possible to decode...
-			}
-		}
-		return false;
-	}
-
-	private boolean isResourceUnderLocation(Resource resource) throws IOException {
-		if (resource.getClass() != this.location.getClass()) {
-			return false;
-		}
-
-		String resourcePath;
-		String locationPath;
-
-		if (resource instanceof UrlResource) {
-			resourcePath = resource.getURL().toExternalForm();
-			locationPath = StringUtils.cleanPath(this.location.getURL().toString());
-		}
-		else if (resource instanceof ClassPathResource) {
-			resourcePath = ((ClassPathResource) resource).getPath();
-			locationPath = StringUtils.cleanPath(((ClassPathResource) this.location).getPath());
-		}
-		else {
-			resourcePath = resource.getURL().getPath();
-			locationPath = StringUtils.cleanPath(this.location.getURL().getPath());
-		}
-
-		if (locationPath.equals(resourcePath)) {
-			return true;
-		}
-		locationPath = (locationPath.endsWith("/") || locationPath.isEmpty() ? locationPath : locationPath + "/");
-		return (resourcePath.startsWith(locationPath) && !isInvalidEncodedResourcePath(resourcePath));
-	}
-
-	private boolean isInvalidEncodedResourcePath(String resourcePath) {
-		if (resourcePath.contains("%")) {
-			// Use URLDecoder (vs UriUtils) to preserve potentially decoded UTF-8 chars...
-			try {
-				String decodedPath = URLDecoder.decode(resourcePath, StandardCharsets.UTF_8.name());
-				if (decodedPath.contains("../") || decodedPath.contains("..\\")) {
-					return true;
-				}
-			}
-			catch (IllegalArgumentException | UnsupportedEncodingException ex) {
-				// May not be possible to decode...
-			}
-		}
-		return false;
 	}
 
 	@Override

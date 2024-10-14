@@ -549,7 +549,8 @@ public class ResourceHttpRequestHandler extends WebContentGenerator
 	protected String processPath(String path) {
 		path = StringUtils.replace(path, "\\", "/");
 		path = cleanDuplicateSlashes(path);
-		return cleanLeadingSlash(path);
+		path = cleanLeadingSlash(path);
+		return normalizePath(path);
 	}
 
 	private String cleanDuplicateSlashes(String path) {
@@ -593,6 +594,21 @@ public class ResourceHttpRequestHandler extends WebContentGenerator
 			}
 		}
 		return (slash ? "/" : "");
+	}
+
+	private static String normalizePath(String path) {
+		if (path.contains("%")) {
+			try {
+				path = URLDecoder.decode(path, "UTF-8");
+			}
+			catch (Exception ex) {
+				return "";
+			}
+			if (path.contains("../")) {
+				path = StringUtils.cleanPath(path);
+			}
+		}
+		return path;
 	}
 
 	/**
@@ -655,7 +671,7 @@ public class ResourceHttpRequestHandler extends WebContentGenerator
 				return true;
 			}
 		}
-		if (path.contains("..") && StringUtils.cleanPath(path).contains("../")) {
+		if (path.contains("../")) {
 			if (logger.isTraceEnabled()) {
 				logger.trace("Path contains \"../\" after call to StringUtils#cleanPath: [" + path + "]");
 			}

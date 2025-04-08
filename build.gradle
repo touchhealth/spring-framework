@@ -5,8 +5,6 @@ buildscript {
 	}
 	dependencies {
 		classpath("io.spring.gradle:propdeps-plugin:0.0.9.RELEASE")
-		classpath("io.spring.gradle:docbook-reference-plugin:0.3.1")
-		classpath("org.asciidoctor:asciidoctor-gradle-plugin:1.5.2")
 		classpath("ws.antonov.gradle.plugins:gradle-plugin-protobuf:0.9.1")
 	}
 }
@@ -182,31 +180,6 @@ configure(allprojects) { project ->
 			}
 		}
 	}
-
-	ext.javadocLinks = [
-		"https://docs.oracle.com/javase/8/docs/api/",
-		"https://docs.oracle.com/javaee/7/api/",
-		"https://docs.oracle.com/cd/E13222_01/wls/docs90/javadocs/",  // CommonJ
-		"https://pic.dhe.ibm.com/infocenter/wasinfo/v7r0/topic/com.ibm.websphere.javadoc.doc/web/apidocs/",
-		"https://glassfish.java.net/nonav/docs/v3/api/",
-		"https://docs.jboss.org/jbossas/javadoc/4.0.5/connector/",
-		"https://docs.jboss.org/jbossas/javadoc/7.1.2.Final/",
-		"https://commons.apache.org/proper/commons-lang/javadocs/api-2.5/",
-		"https://commons.apache.org/proper/commons-codec/apidocs/",
-		"https://commons.apache.org/proper/commons-dbcp/apidocs/",
-		"https://portals.apache.org/pluto/portlet-2.0-apidocs/",
-		"https://tiles.apache.org/tiles-request/apidocs/",
-		"https://tiles.apache.org/framework/apidocs/",
-		"https://www.eclipse.org/aspectj/doc/released/aspectj5rt-api/",
-		"https://www.ehcache.org/apidocs/${ehcacheVersion}/",
-		"https://www.ehcache.org/apidocs/${ehcache3Version}/",
-		"https://www.quartz-scheduler.org/api/2.2.3/",
-		"https://fasterxml.github.io/jackson-core/javadoc/2.8/",
-		"https://fasterxml.github.io/jackson-databind/javadoc/2.8/",
-		"https://fasterxml.github.io/jackson-dataformat-xml/javadoc/2.8/",
-		"https://hc.apache.org/httpcomponents-client-ga/httpclient/apidocs/",
-		"https://junit.org/junit4/javadoc/${junitVersion}/"
-	] as String[]
 }
 
 configure(subprojects - project(":spring-build-src")) { subproject ->
@@ -234,35 +207,14 @@ configure(subprojects - project(":spring-build-src")) { subproject ->
 		}
 	}
 
-	javadoc {
-		description = "Generates project-level javadoc for use in -javadoc jar"
-
-		options.memberLevel = org.gradle.external.javadoc.JavadocMemberLevel.PROTECTED
-		options.author = true
-		options.header = project.name
-		options.links(project.ext.javadocLinks)
-		options.addStringOption('Xdoclint:none', '-quiet')
-
-		// Suppress warnings due to cross-module @see and @link references.
-		// Note that global 'api' task does display all warnings.
-		logging.captureStandardError LogLevel.INFO
-		logging.captureStandardOutput LogLevel.INFO  // suppress "## warnings" message
-	}
-
 	task sourcesJar(type: Jar, dependsOn: classes) {
 		classifier = 'sources'
 		from sourceSets.main.allSource
 		// Don't include or exclude anything explicitly by default. See SPR-12085.
 	}
 
-	task javadocJar(type: Jar) {
-		classifier = "javadoc"
-		from javadoc
-	}
-
 	artifacts {
 		archives sourcesJar
-		archives javadocJar
 	}
 }
 
@@ -1129,31 +1081,10 @@ project("spring-framework-bom") {
 configure(rootProject) {
 	description = "Spring Framework"
 
-	apply plugin: "org.asciidoctor.convert"
-	apply plugin: "docbook-reference"
 	apply plugin: "groovy"
 
 	// apply plugin: "detect-split-packages"
 	apply from: "${gradleScriptDir}/jdiff.gradle"
-
-	asciidoctor {
-		sourceDir project.file('src/asciidoc')
-		separateOutputDirs = false
-		backends = ['docbook']
-		options doctype: 'book', eruby: 'erubis'
-		attributes 'spring-version': project.version, 'revnumber': project.version, 'docinfo': ""
-	}
-
-	reference {
-		sourceDir = asciidoctor.outputDir
-		pdfFilename = "spring-framework-reference.pdf"
-		epubFilename = "spring-framework-reference.epub"
-		expandPlaceholders = ""
-	}
-
-	afterEvaluate {
-		tasks.findAll { it.name.startsWith("reference") }.each{ it.dependsOn.add("asciidoctor") }
-	}
 
 	// TODO: DetectSplitPackagesPlugin fails in line 154 due to method not found on java.io.File.
 	// TODO: Possibly related to user rights or OS differences; passes on local Windows machine.
@@ -1183,169 +1114,6 @@ configure(rootProject) {
 		testCompile("org.aspectj:aspectjweaver:${aspectjVersion}")
 		testCompile("org.hibernate:hibernate-core:${hibernate4Version}")
 		testCompile("org.hsqldb:hsqldb:${hsqldbVersion}")
-	}
-
-	task api(type: Javadoc) {
-		group = "Documentation"
-		description = "Generates aggregated Javadoc API documentation."
-		title = "${rootProject.description} ${version} API"
-
-		dependsOn {
-			subprojects.collect {
-				it.tasks.getByName("jar")
-			}
-		}
-		options.memberLevel = org.gradle.external.javadoc.JavadocMemberLevel.PROTECTED
-		options.author = true
-		options.header = rootProject.description
-		options.overview = "src/api/overview.html"
-		options.stylesheetFile = file("src/api/stylesheet.css")
-		options.splitIndex = true
-		options.links(project.ext.javadocLinks)
-		options.addStringOption('Xdoclint:none', '-quiet')
-
-		source subprojects.collect { project ->
-			project.sourceSets.main.allJava
-		}
-
-		maxMemory = "1024m"
-		destinationDir = new File(buildDir, "api")
-
-		doFirst {
-			classpath = files(
-				// Ensure Servlet 3.x and Hibernate 4.x have precedence on the javadoc
-				// classpath over their respective 2.5 and 3.x variants
-				project(":spring-webmvc").sourceSets.main.compileClasspath.files.find { it =~ "servlet-api" },
-				rootProject.sourceSets.test.compileClasspath.files.find { it =~ "hibernate-core" },
-				// Ensure the javadoc process can resolve types compiled from .aj sources
-				project(":spring-aspects").sourceSets.main.output
-			)
-			classpath += files(subprojects.collect { it.sourceSets.main.compileClasspath })
-		}
-	}
-
-	task docsZip(type: Zip, dependsOn: 'reference') {
-		group = "Distribution"
-		baseName = "spring-framework"
-		classifier = "docs"
-		description = "Builds -${classifier} archive containing api and reference " +
-			"for deployment at https://docs.spring.io/spring-framework/docs."
-
-		from("src/dist") {
-			include "changelog.txt"
-		}
-
-		from (api) {
-			into "javadoc-api"
-		}
-
-		from (reference) {
-			into "spring-framework-reference"
-		}
-	}
-
-	task schemaZip(type: Zip) {
-		group = "Distribution"
-		baseName = "spring-framework"
-		classifier = "schema"
-		description = "Builds -${classifier} archive containing all " +
-			"XSDs for deployment at https://springframework.org/schema."
-		duplicatesStrategy 'exclude'
-		moduleProjects.each { subproject ->
-			def Properties schemas = new Properties();
-
-			subproject.sourceSets.main.resources.find {
-				(it.path.endsWith("META-INF/spring.schemas") || it.path.endsWith("META-INF\\spring.schemas"))
-			}?.withInputStream { schemas.load(it) }
-
-			for (def key : schemas.keySet()) {
-				def shortName = key.replaceAll(/http.*schema.(.*).spring-.*/, '$1')
-				assert shortName != key
-				File xsdFile = subproject.sourceSets.main.resources.find {
-					(it.path.endsWith(schemas.get(key)) || it.path.endsWith(schemas.get(key).replaceAll('\\/','\\\\')))
-				}
-				assert xsdFile != null
-				into (shortName) {
-					from xsdFile.path
-				}
-			}
-		}
-	}
-
-	task distZip(type: Zip, dependsOn: [docsZip, schemaZip]) {
-		group = "Distribution"
-		baseName = "spring-framework"
-		classifier = "dist"
-		description = "Builds -${classifier} archive, containing all jars and docs, " +
-			"suitable for community download page."
-
-		ext.baseDir = "${baseName}-${project.version}";
-
-		from("src/dist") {
-			include "readme.txt"
-			include "license.txt"
-			include "notice.txt"
-			into "${baseDir}"
-			expand(copyright: new Date().format("yyyy"), version: project.version)
-		}
-
-		from(zipTree(docsZip.archivePath)) {
-			into "${baseDir}/docs"
-		}
-
-		from(zipTree(schemaZip.archivePath)) {
-			into "${baseDir}/schema"
-		}
-
-		moduleProjects.each { subproject ->
-			into ("${baseDir}/libs") {
-				from subproject.jar
-				if (subproject.tasks.findByPath("sourcesJar")) {
-					from subproject.sourcesJar
-				}
-				if (subproject.tasks.findByPath("javadocJar")) {
-					from subproject.javadocJar
-				}
-			}
-		}
-	}
-
-	// Create a distribution that contains all dependencies (required and optional).
-	// Not published by default; only for use when building from source.
-	task depsZip(type: Zip, dependsOn: distZip) { zipTask ->
-		group = "Distribution"
-		baseName = "spring-framework"
-		classifier = "dist-with-deps"
-		description = "Builds -${classifier} archive, containing everything " +
-			"in the -${distZip.classifier} archive plus all runtime dependencies."
-
-		from zipTree(distZip.archivePath)
-
-		gradle.taskGraph.whenReady { taskGraph ->
-			if (taskGraph.hasTask(":${zipTask.name}")) {
-				def projectNames = rootProject.subprojects*.name
-				def artifacts = new HashSet()
-				subprojects.each { subproject ->
-					(subproject.configurations.runtime.resolvedConfiguration.resolvedArtifacts +
-					subproject.configurations.optional.resolvedConfiguration.resolvedArtifacts).each { artifact ->
-						def dependency = artifact.moduleVersion.id
-						if (!projectNames.contains(dependency.name)) {
-							artifacts << artifact.file
-						}
-					}
-				}
-
-				zipTask.from(artifacts) {
-					into "${distZip.baseDir}/deps"
-				}
-			}
-		}
-	}
-
-	artifacts {
-		archives docsZip
-		archives schemaZip
-		archives distZip
 	}
 
 	wrapper {

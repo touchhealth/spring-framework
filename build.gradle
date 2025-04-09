@@ -133,6 +133,7 @@ configure(allprojects) { project ->
 	}
 
 	dependencies {
+		testCompile("org.assertj:assertj-core:3.27.2")
 		testCompile("junit:junit:${junitVersion}") {
 			exclude group:'org.hamcrest', module:'hamcrest-core'
 		}

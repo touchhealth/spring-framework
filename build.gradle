@@ -60,7 +60,6 @@ configure(allprojects) { project ->
 	ext.nettyVersion         = "4.1.39.Final"
 	ext.okhttpVersion        = "2.7.5"
 	ext.okhttp3Version       = "3.8.1"
-	ext.openjpaVersion       = "2.4.2"
 	ext.poiVersion           = "3.17"
 	ext.reactorVersion       = "2.0.8.RELEASE"
 	ext.romeVersion          = "1.7.4"
@@ -700,12 +699,6 @@ project("spring-orm") {
 		}
 		optional("org.hibernate:hibernate-entitymanager:${hibernate3Version}") {
 			exclude group: 'org.hibernate.javax.persistence', module: 'hibernate-jpa-2.0-api'
-		}
-		optional("org.apache.openjpa:openjpa:${openjpaVersion}") {
-			exclude group: 'junit', module: 'junit'
-			exclude group: 'org.apache.geronimo.specs', module: 'geronimo-jpa_2.0_spec'
-			exclude group: 'org.apache.geronimo.specs', module: 'geronimo-jta_1.1_spec'
-			exclude group: 'org.apache.geronimo.specs', module: 'geronimo-jms_1.1_spec'
 		}
 		optional("javax.jdo:jdo-api:3.1") {
 			exclude group: 'javax.transaction', module: 'transaction-api'

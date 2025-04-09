@@ -97,7 +97,7 @@ class MergePlugin implements Plugin<Project> {
 
 	private void setupTaskDependencies(Project project) {
 		// invoking a task will invoke the task with the same name on 'into' project
-		["sourcesJar", "jar", "javadocJar", "javadoc", "install", "artifactoryPublish"].each {
+		["sourcesJar", "jar", "javadocJar", "javadoc", "install", "uploadArchives", "artifactoryPublish"].each {
 			def task = project.tasks.findByPath(it)
 			if (task) {
 				task.enabled = false
@@ -133,7 +133,9 @@ class MergePlugin implements Plugin<Project> {
 					}
 				}
 				def index = project.parent.childProjects.findIndexOf {p -> p.getValue() == project}
-				project.merge.into.install.repositories.mavenInstaller.pom.scopeMappings.addMapping(
+				def installer = project.merge.into.install.repositories.mavenInstaller
+				def deployer = project.merge.into.uploadArchives.repositories.mavenDeployer
+				[installer, deployer]*.pom*.scopeMappings*.addMapping(
 					mapping.priority + 100 + index, intoConfiguration, mapping.scope)
 			}
 		}

@@ -6,6 +6,19 @@ install {
 	}
 }
 
+uploadArchives {
+	repositories {
+		mavenDeployer {
+			customizePom(pom, project)
+
+			def mavenRepository = project.parent.mavenRepository
+			repository(url: mavenRepository.url) {
+				authentication(userName: mavenRepository.username, password: mavenRepository.password)
+			}
+		}
+	}
+}
+
 def customizePom(pom, gradleProject) {
 	pom.whenConfigured { generatedPom ->
 		// eliminate test-scoped dependencies (no need in maven central poms)

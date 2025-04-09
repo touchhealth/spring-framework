@@ -1,0 +1,7 @@
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation "org.apache.maven:maven-settings-builder:3.9.9"
+}

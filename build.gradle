@@ -1,7 +1,8 @@
+apply plugin: "maven-repository-settings"
+
 buildscript {
 	repositories {
-		gradlePluginPortal()
-		maven { url "https://repo.spring.io/plugins-release" }
+		mavenCentral()
 	}
 	dependencies {
 		classpath("ws.antonov.gradle.plugins:gradle-plugin-protobuf:0.9.1")
@@ -1051,22 +1052,20 @@ project("spring-framework-bom") {
 		archives(file("spring-framework-bom.txt"))
 	}
 
-	install {
-		repositories.mavenInstaller {
-			pom.whenConfigured {
-				packaging = "pom"
-				withXml {
-					asNode().children().last() + {
-						delegate.dependencyManagement {
-							delegate.dependencies {
-								parent.subprojects.sort { "$it.name" }.each { p ->
-									if (p.hasProperty("merge") && p.merge.into == null && p != project) {
-										delegate.dependency {
-											delegate.groupId(p.group)
-											delegate.artifactId(p.name)
-											delegate.version(p.version)
-										}
-									}
+	def installer = install.repositories.mavenInstaller
+	def deployer = uploadArchives.repositories.mavenDeployer
+	[installer, deployer]*.pom*.whenConfigured {
+		packaging = "pom"
+		withXml {
+			asNode().children().last() + {
+				delegate.dependencyManagement {
+					delegate.dependencies {
+						parent.subprojects.sort { "$it.name" }.each { p ->
+							if (p.hasProperty("merge") && p.merge.into == null && p != project) {
+								delegate.dependency {
+									delegate.groupId(p.group)
+									delegate.artifactId(p.name)
+									delegate.version(p.version)
 								}
 							}
 						}

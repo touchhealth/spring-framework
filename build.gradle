@@ -103,8 +103,8 @@ configure(allprojects) { project ->
 		"-Xlint:-unchecked", "-Xlint:-options"]
 
 	compileJava {
-		sourceCompatibility = 1.6
-		targetCompatibility = 1.6
+		sourceCompatibility = 1.8
+		targetCompatibility = 1.8
 		options.encoding = 'UTF-8'
 	}
 
@@ -357,8 +357,8 @@ project("spring-beans-groovy") {
 	}
 
 	compileGroovy {
-		sourceCompatibility = 1.6
-		targetCompatibility = 1.6
+		sourceCompatibility = 1.8
+		targetCompatibility = 1.8
 	}
 }
 

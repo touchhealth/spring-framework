@@ -21,6 +21,10 @@ ext {
 	}
 }
 
+configure(rootProject) {
+	apply plugin: "org.springframework.build.maven-repository-settings"
+}
+
 configure(allprojects) { project ->
 	apply plugin: "io.spring.dependency-management"
 

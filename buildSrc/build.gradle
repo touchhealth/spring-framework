@@ -9,6 +9,7 @@ repositories {
 
 dependencies {
 	implementation "me.champeau.gradle:japicmp-gradle-plugin:0.3.0"
+	implementation "org.apache.maven:maven-settings-builder:3.9.9"
 }
 
 gradlePlugin {
@@ -20,6 +21,10 @@ gradlePlugin {
 		compileConventionsPlugin {
 			id = "org.springframework.build.compile"
 			implementationClass = "org.springframework.build.compile.CompilerConventionsPlugin"
+		}
+		mavenRepositorySettingsPlugin {
+			id = "org.springframework.build.maven-repository-settings"
+			implementationClass = "org.springframework.build.maven.MavenRepositorySettingsPlugin"
 		}
 		optionalDependenciesPlugin {
 			id = "org.springframework.build.optional-dependencies"

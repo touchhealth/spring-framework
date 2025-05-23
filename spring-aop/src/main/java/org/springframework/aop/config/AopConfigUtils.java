@@ -150,6 +150,11 @@ public abstract class AopConfigUtils {
 			if (clazz.getName().equals(className)) {
 				return i;
 			}
+			// PATCH START
+			if (className != null && className.endsWith(clazz.getSimpleName())) {
+				return i;
+			}
+			// PATCH END
 		}
 		throw new IllegalArgumentException(
 				"Class name [" + className + "] is not a known auto-proxy creator class");

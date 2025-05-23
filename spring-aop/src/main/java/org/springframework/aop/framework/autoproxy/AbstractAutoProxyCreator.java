@@ -472,6 +472,13 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 			proxyFactory.setPreFiltered(true);
 		}
 
+		// PATCH START
+		ClassLoader proxyClassLoader = getProxyClassLoader(beanClass);
+		if (proxyClassLoader != null) {
+			return proxyFactory.getProxy(proxyClassLoader);
+		}
+		// PATCH END
+
 		// Use original ClassLoader if bean class not locally loaded in overriding class loader
 		ClassLoader classLoader = getProxyClassLoader();
 		if (classLoader instanceof SmartClassLoader && classLoader != beanClass.getClassLoader()) {
@@ -599,4 +606,17 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 	protected abstract Object[] getAdvicesAndAdvisorsForBean(Class<?> beanClass, String beanName,
 			@Nullable TargetSource customTargetSource) throws BeansException;
 
+	// PATCH START
+	/**
+	 * Subclasses may choose to implement this method to override the classloader used to generate the proxies of
+	 * specific beans.
+	 * @param beanClass the class of the bean
+	 * @return the ClassLoader to generate the proxy in, or {@code null} if the default ClassLoader selection logic
+	 * should be applied.
+	 */
+	@Nullable
+	protected ClassLoader getProxyClassLoader(Class<?> beanClass) {
+		return null;
+	}
+	// PATCH END
 }

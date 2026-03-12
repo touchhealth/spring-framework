@@ -81,8 +81,8 @@ public class ScriptTemplateViewTests {
 	@Test
 	public void missingScriptTemplateConfig() throws Exception {
 		assertThatExceptionOfType(ApplicationContextException.class).isThrownBy(() ->
-				this.view.setApplicationContext(new StaticApplicationContext()))
-			.withMessageContaining("ScriptTemplateConfig");
+						this.view.setApplicationContext(new StaticApplicationContext()))
+				.withMessageContaining("ScriptTemplateConfig");
 	}
 
 	@Test
@@ -173,8 +173,8 @@ public class ScriptTemplateViewTests {
 		this.view.setEngineName("test");
 		this.view.setRenderFunction("render");
 		assertThatIllegalArgumentException().isThrownBy(() ->
-				this.view.setApplicationContext(this.context))
-			.withMessageContaining("You should define either 'engine', 'engineSupplier', or 'engineName'.");
+						this.view.setApplicationContext(this.context))
+				.withMessageContaining("You should define either 'engine', 'engineSupplier', or 'engineName'.");
 	}
 
 	@Test  // gh-23258
@@ -184,7 +184,7 @@ public class ScriptTemplateViewTests {
 		this.view.setEngine(engine);
 		this.view.setRenderFunction("render");
 		assertThatIllegalArgumentException().isThrownBy(() ->
-				this.view.setApplicationContext(this.context))
+						this.view.setApplicationContext(this.context))
 				.withMessageContaining("You should define either 'engine', 'engineSupplier', or 'engineName'.");
 	}
 
@@ -194,7 +194,7 @@ public class ScriptTemplateViewTests {
 		this.view.setEngineName("test");
 		this.view.setRenderFunction("render");
 		assertThatIllegalArgumentException().isThrownBy(() ->
-				this.view.setApplicationContext(this.context))
+						this.view.setApplicationContext(this.context))
 				.withMessageContaining("You should define either 'engine', 'engineSupplier', or 'engineName'.");
 	}
 
@@ -204,8 +204,25 @@ public class ScriptTemplateViewTests {
 		this.view.setRenderFunction("render");
 		this.view.setSharedEngine(false);
 		assertThatIllegalArgumentException().isThrownBy(() ->
-				this.view.setApplicationContext(this.context))
-			.withMessageContaining("sharedEngine");
+						this.view.setApplicationContext(this.context))
+				.withMessageContaining("sharedEngine");
+	}
+
+	@Test
+	public void resourceLoaderPath() {
+		this.view.setEngine(mock(InvocableScriptEngine.class));
+		this.view.setApplicationContext(this.context);
+		DirectFieldAccessor viewAccessor = new DirectFieldAccessor(this.view);
+		String[] resourceLoaderPaths = (String[]) viewAccessor.getPropertyValue("resourceLoaderPaths");
+		assertThat(resourceLoaderPaths).containsExactly("classpath:");
+
+		this.view.setResourceLoaderPath("classpath:org/springframework/web/reactive/result/view/script/");
+		resourceLoaderPaths = (String[]) viewAccessor.getPropertyValue("resourceLoaderPaths");
+		assertThat(resourceLoaderPaths).containsExactly("classpath:org/springframework/web/reactive/result/view/script/");
+
+		this.view.setResourceLoaderPath("classpath:org/springframework/web/reactive/result/view/script");
+		resourceLoaderPaths = (String[]) viewAccessor.getPropertyValue("resourceLoaderPaths");
+		assertThat(resourceLoaderPaths).containsExactly("classpath:org/springframework/web/reactive/result/view/script/");
 	}
 
 	@Test  // gh-23258

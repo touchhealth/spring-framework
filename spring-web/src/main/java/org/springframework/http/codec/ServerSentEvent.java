@@ -250,8 +250,10 @@ public final class ServerSentEvent<T> {
 		}
 
 		private static void checkEvent(String content) {
-			Assert.isTrue(content.indexOf('\n') == -1 && content.indexOf('\r') == -1,
-					"illegal character '\\n' or '\\r' in event content");
+			if (content != null) {
+				Assert.isTrue(content.indexOf('\n') == -1 && content.indexOf('\r') == -1,
+						"illegal character '\\n' or '\\r' in event content");
+			}
 		}
 
 		@Override

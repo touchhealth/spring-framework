@@ -18,10 +18,12 @@ package org.springframework.http.codec;
 
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 /**
@@ -42,6 +44,18 @@ class ServerSentEventTests {
 	void rejectsInvalidEvent(String newLine, String description) {
 		assertThatIllegalArgumentException().isThrownBy(() ->
 				ServerSentEvent.<String>builder().event("first" + newLine + "second").build());
+	}
+
+	@Test // gh-36634
+	void allowsNullId() {
+		ServerSentEvent<String> event = ServerSentEvent.<String>builder().id(null).event("first").build();
+		assertThat(event.format()).contains("event:first").doesNotContain("id");
+	}
+
+	@Test // gh-36634
+	void allowsNullEvent() {
+		ServerSentEvent<String> event = ServerSentEvent.<String>builder().id("42").event(null).build();
+		assertThat(event.format()).contains("id:42").doesNotContain("event");
 	}
 
 	private static Stream<Arguments> newLineCharacters() {

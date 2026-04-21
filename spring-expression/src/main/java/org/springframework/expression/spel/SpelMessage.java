@@ -287,7 +287,10 @@ public enum SpelMessage {
 			"Assignment to variable ''{0}'' is not supported"),
 
 	NEGATIVE_REPEATED_TEXT_COUNT(Kind.ERROR, 1081,
-			"Repeat count ''{0}'' must not be negative");
+			"Repeat count ''{0}'' must not be negative"),
+
+	MAX_OPERATIONS_EXCEEDED(Kind.ERROR, 1085,
+			"SpEL expression evaluation exceeded the threshold of ''{0}'' operations");
 
 
 	private final Kind kind;

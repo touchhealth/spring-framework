@@ -24,7 +24,7 @@ import org.springframework.expression.EvaluationException;
 import org.springframework.expression.TypedValue;
 import org.springframework.expression.spel.ExpressionState;
 import org.springframework.expression.spel.SpelNode;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
@@ -38,108 +38,80 @@ import org.springframework.util.Assert;
  */
 public class InlineMap extends SpelNodeImpl {
 
-	// If the map is purely literals, it is a constant value and can be computed and cached
+	private final boolean isConstant;
+
 	@Nullable
-	private final TypedValue constant;
+	private volatile TypedValue constant;
 
 
 	public InlineMap(int startPos, int endPos, SpelNodeImpl... args) {
 		super(startPos, endPos, args);
-		this.constant =	computeConstantValue();
+		this.isConstant = determineIfConstant();
 	}
 
 
 	/**
-	 * If all the components of the map are constants, or lists/maps that themselves
-	 * contain constants, then a constant list can be built to represent this node.
-	 * This will speed up later getValue calls and reduce the amount of garbage created.
+	 * Determine whether this map is structurally eligible to be a constant
+	 * value: whether all of its components are themselves constants or lists/maps
+	 * that contain only constants.
+	 * <p>The actual constant value is created lazily on the first call to
+	 * {@link #getValueInternal(ExpressionState)}.
 	 */
-	@Nullable
-	private TypedValue computeConstantValue() {
-		for (int c = 0, max = getChildCount(); c < max; c++) {
-			SpelNode child = getChild(c);
-			if (!(child instanceof Literal)) {
-				if (child instanceof InlineList) {
-					InlineList inlineList = (InlineList) child;
-					if (!inlineList.isConstant()) {
-						return null;
-					}
-				}
-				else if (child instanceof InlineMap) {
-					InlineMap inlineMap = (InlineMap) child;
-					if (!inlineMap.isConstant()) {
-						return null;
-					}
-				}
-				else if (!(c % 2 == 0 && child instanceof PropertyOrFieldReference)) {
-					if (!(child instanceof OpMinus) || !((OpMinus) child).isNegativeNumberLiteral()) {
-						return null;
-					}
-				}
-			}
-		}
-
-		Map<Object, Object> constantMap = new LinkedHashMap<>();
+	private boolean determineIfConstant() {
 		int childCount = getChildCount();
-		ExpressionState expressionState = new ExpressionState(new StandardEvaluationContext());
 		for (int c = 0; c < childCount; c++) {
-			SpelNode keyChild = getChild(c++);
-			SpelNode valueChild = getChild(c);
-			Object key;
-			Object value = null;
-			if (keyChild instanceof Literal) {
-				key = ((Literal) keyChild).getLiteralValue().getValue();
+			SpelNode child = getChild(c);
+			if (child instanceof Literal) {
+				continue;
 			}
-			else if (keyChild instanceof PropertyOrFieldReference) {
-				key = ((PropertyOrFieldReference) keyChild).getName();
+			if (child instanceof InlineList && ((InlineList) child).isConstant()) {
+				continue;
 			}
-			else if (keyChild instanceof OpMinus) {
-				key = keyChild.getValue(expressionState);
+			if (child instanceof InlineMap && ((InlineMap) child).isConstant()) {
+				continue;
 			}
-			else {
-				return null;
+			if (c % 2 == 0 && child instanceof PropertyOrFieldReference) {
+				continue;
 			}
-			if (valueChild instanceof Literal) {
-				value = ((Literal) valueChild).getLiteralValue().getValue();
+			if (child instanceof OpMinus && ((OpMinus) child).isNegativeNumberLiteral()) {
+				continue;
 			}
-			else if (valueChild instanceof InlineList) {
-				value = ((InlineList) valueChild).getConstantValue();
-			}
-			else if (valueChild instanceof InlineMap) {
-				value = ((InlineMap) valueChild).getConstantValue();
-			}
-			else if (valueChild instanceof OpMinus) {
-				value = valueChild.getValue(expressionState);
-			}
-			constantMap.put(key, value);
+			return false;
 		}
-		return new TypedValue(Collections.unmodifiableMap(constantMap));
+		return true;
 	}
 
 	@Override
 	public TypedValue getValueInternal(ExpressionState expressionState) throws EvaluationException {
-		if (this.constant != null) {
-			return this.constant;
+		TypedValue result = this.constant;
+		if (result != null) {
+			return result;
 		}
-		else {
-			Map<Object, Object> returnValue = new LinkedHashMap<>();
-			int childcount = getChildCount();
-			for (int c = 0; c < childcount; c++) {
-				// TODO allow for key being PropertyOrFieldReference like Indexer on maps
-				SpelNode keyChild = getChild(c++);
-				Object key = null;
-				if (keyChild instanceof PropertyOrFieldReference) {
-					PropertyOrFieldReference reference = (PropertyOrFieldReference) keyChild;
-					key = reference.getName();
-				}
-				else {
-					key = keyChild.getValue(expressionState);
-				}
-				Object value = getChild(c).getValue(expressionState);
-				returnValue.put(key,  value);
+		result = createMap(expressionState);
+		if (this.isConstant) {
+			this.constant = result;
+		}
+		return result;
+	}
+
+	private TypedValue createMap(ExpressionState expressionState) throws EvaluationException {
+		expressionState.trackOperation();
+		Map<Object, Object> map = new LinkedHashMap<>();
+		int childCount = getChildCount();
+		for (int c = 0; c < childCount; c++) {
+			SpelNode keyChild = getChild(c++);
+			Object key;
+			if (keyChild instanceof PropertyOrFieldReference) {
+				key = ((PropertyOrFieldReference) keyChild).getName();
 			}
-			return new TypedValue(returnValue);
+			else {
+				key = keyChild.getValue(expressionState);
+			}
+			Object value = getChild(c).getValue(expressionState);
+			expressionState.trackOperation();
+			map.put(key, value);
 		}
+		return new TypedValue(this.isConstant ? Collections.unmodifiableMap(map) : map);
 	}
 
 	@Override
@@ -159,17 +131,33 @@ public class InlineMap extends SpelNodeImpl {
 	}
 
 	/**
-	 * Return whether this list is a constant value.
+	 * Return whether this map is structurally a constant value.
+	 * <p>Note that the resulting constant value is created lazily on the
+	 * first call to {@link #getValueInternal(ExpressionState)} or
+	 * {@link #getConstantValue()}.
 	 */
 	public boolean isConstant() {
-		return this.constant != null;
+		return this.isConstant;
 	}
 
+	/**
+	 * Return the cached constant {@link Map} value for this inline map,
+	 * lazily creating it on first access.
+	 * @see #isConstant()
+	 * @deprecated this method was only intended for
+	 * testing purposes and will be removed in a future version of the framework
+	 */
 	@SuppressWarnings("unchecked")
+	@Deprecated
 	@Nullable
 	public Map<Object, Object> getConstantValue() {
-		Assert.state(this.constant != null, "No constant");
-		return (Map<Object, Object>) this.constant.getValue();
+		Assert.state(this.isConstant, "Not a constant");
+		TypedValue result = this.constant;
+		if (result == null) {
+			result = createMap(new ExpressionState(SimpleEvaluationContext.forReadOnlyDataBinding().build()));
+			this.constant = result;
+		}
+		return (Map<Object, Object>) result.getValue();
 	}
 
 }

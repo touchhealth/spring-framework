@@ -50,6 +50,13 @@ public class OpMinus extends Operator {
 
 	public OpMinus(int startPos, int endPos, SpelNodeImpl... operands) {
 		super("-", startPos, endPos, operands);
+		// If this is a unary negation of a number literal, the exit type descriptor
+		// can be derived statically from the literal. Doing so up front lets the
+		// compiler determine that this node is compilable without first evaluating
+		// the expression.
+		if (isNegativeNumberLiteral()) {
+			this.exitTypeDescriptor = ((Literal) operands[0]).exitTypeDescriptor;
+		}
 	}
 
 
@@ -70,6 +77,7 @@ public class OpMinus extends Operator {
 		if (this.children.length < 2) {  // if only one operand, then this is unary minus
 			Object operand = leftOp.getValueInternal(state).getValue();
 			if (operand instanceof Number) {
+				state.trackOperation();
 				if (operand instanceof BigDecimal) {
 					return new TypedValue(((BigDecimal) operand).negate());
 				}
@@ -110,6 +118,7 @@ public class OpMinus extends Operator {
 		Object right = getRightOperand().getValueInternal(state).getValue();
 
 		if (left instanceof Number && right instanceof Number) {
+			state.trackOperation();
 			Number leftNumber = (Number) left;
 			Number rightNumber = (Number) right;
 
@@ -146,6 +155,7 @@ public class OpMinus extends Operator {
 		}
 
 		if (left instanceof String && right instanceof Integer && ((String) left).length() == 1) {
+			state.trackOperation();
 			String theString = (String) left;
 			Integer theInteger = (Integer) right;
 			// Implements character - int (ie. b - 1 = a)

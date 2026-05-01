@@ -182,6 +182,7 @@ public class InMemoryWebSessionStore implements WebSessionStore {
 
 		private final AtomicReference<State> state = new AtomicReference<>(State.NEW);
 
+		private final Lock lock = new ReentrantLock();
 
 		public InMemoryWebSession(Instant creationTime) {
 			this.creationTime = creationTime;
@@ -229,24 +230,6 @@ public class InMemoryWebSessionStore implements WebSessionStore {
 		}
 
 		@Override
-		public Mono<Void> changeSessionId() {
-			String currentId = this.id.get();
-			InMemoryWebSessionStore.this.sessions.remove(currentId);
-			String newId = String.valueOf(idGenerator.generateId());
-			this.id.set(newId);
-			InMemoryWebSessionStore.this.sessions.put(this.getId(), this);
-			return Mono.empty();
-		}
-
-		@Override
-		public Mono<Void> invalidate() {
-			this.state.set(State.EXPIRED);
-			getAttributes().clear();
-			InMemoryWebSessionStore.this.sessions.remove(this.id.get());
-			return Mono.empty();
-		}
-
-		@Override
 		public Mono<Void> save() {
 
 			checkMaxSessionsLimit();
@@ -258,11 +241,19 @@ public class InMemoryWebSessionStore implements WebSessionStore {
 
 			if (isStarted()) {
 				// Save
-				InMemoryWebSessionStore.this.sessions.put(this.getId(), this);
+				if (InMemoryWebSessionStore.this.sessions.get(getId()) == null) {
+					this.lock.lock();
+					try {
+						InMemoryWebSessionStore.this.sessions.putIfAbsent(getId(), this);
+					}
+					finally {
+						this.lock.unlock();
+					}
+				}
 
 				// Unless it was invalidated
 				if (this.state.get().equals(State.EXPIRED)) {
-					InMemoryWebSessionStore.this.sessions.remove(this.getId());
+					InMemoryWebSessionStore.this.sessions.remove(getId());
 					return Mono.error(new IllegalStateException("Session was invalidated"));
 				}
 			}
@@ -277,6 +268,30 @@ public class InMemoryWebSessionStore implements WebSessionStore {
 					throw new IllegalStateException("Max sessions limit reached: " + sessions.size());
 				}
 			}
+		}
+
+		@Override
+		public Mono<Void> changeSessionId() {
+			this.lock.lock();
+			try {
+				String oldId = getId();
+				String newId = String.valueOf(idGenerator.generateId());
+				InMemoryWebSessionStore.this.sessions.remove(oldId);
+				InMemoryWebSessionStore.this.sessions.put(newId, this);
+				this.id.set(newId);
+			}
+			finally {
+				this.lock.unlock();
+			}
+			return Mono.empty();
+		}
+
+		@Override
+		public Mono<Void> invalidate() {
+			this.state.set(State.EXPIRED);
+			getAttributes().clear();
+			InMemoryWebSessionStore.this.sessions.remove(getId());
+			return Mono.empty();
 		}
 
 		@Override

@@ -39,6 +39,12 @@ import org.springframework.util.StreamUtils;
 public class ByteArrayHttpMessageConverter extends AbstractHttpMessageConverter<byte[]> {
 
 	/**
+	 * The default buffer size used by {@link java.io.InputStream} as of Java 21.
+	 */
+	private static final int BUFFER_SIZE = 16384;
+
+
+	/**
 	 * Create a new instance of the {@code ByteArrayHttpMessageConverter}.
 	 */
 	public ByteArrayHttpMessageConverter() {
@@ -54,8 +60,8 @@ public class ByteArrayHttpMessageConverter extends AbstractHttpMessageConverter<
 	@Override
 	public byte[] readInternal(Class<? extends byte[]> clazz, HttpInputMessage inputMessage) throws IOException {
 		long contentLength = inputMessage.getHeaders().getContentLength();
-		ByteArrayOutputStream bos =
-				new ByteArrayOutputStream(contentLength >= 0 ? (int) contentLength : StreamUtils.BUFFER_SIZE);
+		int initialBufferSize = contentLength >= 0 ? (int) Math.min(contentLength, BUFFER_SIZE) : BUFFER_SIZE;
+		ByteArrayOutputStream bos = new ByteArrayOutputStream(initialBufferSize);
 		StreamUtils.copy(inputMessage.getBody(), bos);
 		return bos.toByteArray();
 	}

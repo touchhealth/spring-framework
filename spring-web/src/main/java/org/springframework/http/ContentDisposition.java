@@ -251,12 +251,12 @@ public final class ContentDisposition {
 		}
 		if (this.name != null) {
 			sb.append("; name=\"");
-			sb.append(this.name).append('\"');
+			appendName(sb, this.name).append('\"');
 		}
 		if (this.filename != null) {
 			if (this.charset == null || StandardCharsets.US_ASCII.equals(this.charset)) {
 				sb.append("; filename=\"");
-				sb.append(escapeQuotationsInFilename(this.filename)).append('\"');
+				appendName(sb, this.filename).append('\"');
 			}
 			else {
 				sb.append("; filename*=");
@@ -500,27 +500,27 @@ public final class ContentDisposition {
 				c == '.' || c == '^' || c == '_' || c == '`' || c == '|' || c == '~';
 	}
 
-	private static String escapeQuotationsInFilename(String filename) {
-		if (filename.indexOf('"') == -1 && filename.indexOf('\\') == -1) {
-			return filename;
-		}
+	private static StringBuilder appendName(StringBuilder buffer, String name) {
 		boolean escaped = false;
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < filename.length() ; i++) {
-			char c = filename.charAt(i);
+		for (int i = 0; i < name.length() ; i++) {
+			char c = name.charAt(i);
+			// strip control characters
+			if (c <= 0x1F || c == 0x7F) {
+				continue;
+			}
 			if (!escaped && c == '"') {
-				sb.append("\\\"");
+				buffer.append("\\\"");
 			}
 			else {
-				sb.append(c);
+				buffer.append(c);
 			}
 			escaped = (!escaped && c == '\\');
 		}
 		// Remove backslash at the end.
 		if (escaped) {
-			sb.deleteCharAt(sb.length() - 1);
+			buffer.deleteCharAt(buffer.length() - 1);
 		}
-		return sb.toString();
+		return buffer;
 	}
 
 	/**

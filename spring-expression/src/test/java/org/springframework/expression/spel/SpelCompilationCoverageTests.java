@@ -55,6 +55,7 @@ import static org.assertj.core.api.Assertions.assertThatException;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.within;
 import static org.assertj.core.api.InstanceOfAssertFactories.BOOLEAN;
+import static org.springframework.expression.spel.standard.SpelExpressionTestUtils.assertIsCompiled;
 
 /**
  * Checks SpelCompiler behavior. This should cover compilation all compiled node types.
@@ -5638,18 +5639,6 @@ public class SpelCompilationCoverageTests extends AbstractExpressionTests {
 
 	private void assertGetValueFail(Expression expression) {
 		assertThatException().isThrownBy(expression::getValue);
-	}
-
-	public static void assertIsCompiled(Expression expression) {
-		try {
-			Field field = SpelExpression.class.getDeclaredField("compiledAst");
-			field.setAccessible(true);
-			Object object = field.get(expression);
-			assertThat(object).isNotNull();
-		}
-		catch (Exception ex) {
-			throw new AssertionError(ex.getMessage(), ex);
-		}
 	}
 
 
